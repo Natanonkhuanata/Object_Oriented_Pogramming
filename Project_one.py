@@ -1,6 +1,5 @@
 """
-ตัวจำลองการปลดหนี้ (Debt Payoff Simulator)
-แสดงการใช้ OOP: Abstraction, Inheritance, Polymorphism, Strategy Pattern
+ตัวจำลองการปลดหนี้ (Debt Payoff Simulator) - เวอร์ชันให้ผู้ใช้กรอกหนี้เอง
 """
 
 from abc import ABC, abstractmethod
@@ -10,7 +9,7 @@ from copy import deepcopy
 # ======================================================================
 # 1) DEBT: abstract class + ลูกแต่ละแบบคิดดอกเบี้ยต่างกัน (Polymorphism)
 # ======================================================================
-class Debt(ABC): # Main class
+class Debt(ABC): # Main class ของหหนี้แต่ละชนิด
     def __init__(self, name, balance, min_payment):
         self.name = name
         self.balance = balance
@@ -38,7 +37,7 @@ class Debt(ABC): # Main class
         return f"<{self.name}: {self.balance:,.0f} บาท @ {self.effective_rate:.1%}>"
 
 
-class CreditCard(Debt):
+class CreditCard(Debt): # หนี้บัตรเครดิต: ดอกเบี้ยแบบลดต้นลดดอก (compounding interest)
     def __init__(self, name, balance, min_payment, annual_rate=0.18):
         super().__init__(name, balance, min_payment)
         self.annual_rate = annual_rate
@@ -51,7 +50,7 @@ class CreditCard(Debt):
         return self.annual_rate
 
 
-class CarLoan(Debt):
+class CarLoan(Debt): # หนี้รถยนต์: ดอกเบี้ยแบบ flat rate (คิดจากเงินตั้งต้นเสมอ)
     """ดอกเบี้ยแบบ flat rate: คิดจากเงินต้นตั้งต้นเสมอ ไม่ใช่ยอดคงเหลือ"""
 
     def __init__(self, name, balance, min_payment, flat_rate=0.03):
@@ -67,7 +66,7 @@ class CarLoan(Debt):
         return self.flat_rate * 1.8  # ค่าประมาณ effective rate ของ flat rate
 
 
-class StudentLoan(Debt):
+class StudentLoan(Debt): # หนนี้กยศ. / เงินกู้เพื่อการศึกษา: ดอกเบี้ยแบบลดต้นลดดอก
     def __init__(self, name, balance, min_payment, annual_rate=0.01):
         super().__init__(name, balance, min_payment)
         self.annual_rate = annual_rate
@@ -80,7 +79,7 @@ class StudentLoan(Debt):
         return self.annual_rate
 
 
-class LoanShark(Debt):
+class LoanShark(Debt): # หนี้นอกระบบ: ดอกเบี้ยรวมไม่ควรเกิน 5% ต่อสัปดาห์ หรือ 260% ต่อปี และ 20% ต่อเดือน ตามกฏหมายของประเทศไทย
     """หนี้นอกระบบ: ดอกเบี้ยรายสัปดาห์ แพงที่สุดในกลุ่ม"""
 
     def __init__(self, name, balance, min_payment, weekly_rate=0.05):
@@ -93,6 +92,31 @@ class LoanShark(Debt):
     @property
     def effective_rate(self):
         return self.weekly_rate * 52
+
+
+class PersonalLoan(Debt): # หนี้ส่วนบุคคล: ดอกเบี้ยแบบลดต้นลดดอก 
+    """สินเชื่อส่วนบุคคล: ดอกเบี้ยลดต้นลดดอกแบบธนาคารทั่วไป"""
+
+    def __init__(self, name, balance, min_payment, annual_rate=0.10):
+        super().__init__(name, balance, min_payment)
+        self.annual_rate = annual_rate
+
+    def monthly_interest(self):
+        return self.balance * self.annual_rate / 12
+
+    @property
+    def effective_rate(self):
+        return self.annual_rate
+
+
+# แมปชนิดหนี้ที่ให้ผู้ใช้เลือก กับ class และอัตราดอกเบี้ยเริ่มต้น
+DEBT_TYPES = {
+    "1": ("บัตรเครดิต", CreditCard, 0.18, "annual_rate"),
+    "2": ("ผ่อนรถ", CarLoan, 0.03, "flat_rate"),
+    "3": ("กยศ. / เงินกู้เพื่อการศึกษา", StudentLoan, 0.01, "annual_rate"),
+    "4": ("หนี้นอกระบบ", LoanShark, 0.03, "weekly_rate"),
+    "5": ("สินเชื่อส่วนบุคคล", PersonalLoan, 0.10, "annual_rate"),
+}
 
 
 # ======================================================================
@@ -141,7 +165,7 @@ class Simulator:
             raise ValueError(
                 f"งบ {monthly_budget:,.0f} น้อยกว่ายอดขั้นต่ำรวม {min_total:,.0f}"
             )
-        self.debts = deepcopy(debts)  # แต่ละกลยุทธ์เริ่มจากข้อมูลชุดเดียวกัน
+        self.debts = deepcopy(debts)
         self.budget = monthly_budget
         self.strategy = strategy
 
@@ -151,16 +175,16 @@ class Simulator:
         while any(not d.is_paid_off for d in self.debts) and months < max_months:
             months += 1
 
-            for d in self.debts:  # (1) คิดดอกเบี้ยทุกหนี้
+            for d in self.debts:
                 interest = d.monthly_interest()
                 d.balance += interest
                 total_interest += interest
 
-            budget = self.budget  # (2) จ่ายขั้นต่ำทุกหนี้
+            budget = self.budget
             for d in self.debts:
                 budget -= d.pay(d.min_payment)
 
-            while budget > 0.01:  # (3) โปะหนี้เป้าหมายตามกลยุทธ์
+            while budget > 0.01:
                 active = [d for d in self.debts if not d.is_paid_off]
                 if not active:
                     break
@@ -178,7 +202,7 @@ class Simulator:
 
 
 # ======================================================================
-# 4) REPORT: ผลลัพธ์ของการจำลองหนึ่งรอบ
+# 4) REPORT
 # ======================================================================
 class SimulationReport:
     def __init__(self, strategy_name, months, total_interest, history):
@@ -188,49 +212,123 @@ class SimulationReport:
         self.history = history
 
     def __str__(self):
+        years = self.months // 12
+        rem_months = self.months % 12
+        duration = f"{years} ปี {rem_months} เดือน" if years else f"{rem_months} เดือน"
         return (
             f"{self.strategy_name}\n"
-            f"  หมดหนี้ใน {self.months} เดือน | ดอกเบี้ยรวม {self.total_interest:,.0f} บาท"
+            f"  หมดหนี้ใน {self.months} เดือน ({duration})\n"
+            f"  ดอกเบี้ยรวมที่ต้องจ่าย {self.total_interest:,.0f} บาท"
         )
 
 
 def compare_strategies(debts, budget, strategies):
-    """รันทุกกลยุทธ์บนหนี้ชุดเดียวกัน แล้วคืนรายงานเรียงตามดอกเบี้ยรวมน้อยสุด"""
     reports = [Simulator(debts, budget, s).run() for s in strategies]
     return sorted(reports, key=lambda r: r.total_interest)
 
 
 # ======================================================================
-# ทดลองรัน
+# 5) INPUT: ให้ผู้ใช้กรอกหนี้ของตัวเองทีละก้อน
 # ======================================================================
-print()
-print()
-if __name__ == "__main__":
-    my_debts = [
-        CreditCard("บัตรเครดิต A", 40_000, 1_600, annual_rate=0.20),
-        CarLoan("ผ่อนรถ", 150_000, 5_000, flat_rate=0.03),
-        StudentLoan("กยศ.", 80_000, 1_000, annual_rate=0.01),
-        LoanShark("หนี้นอกระบบ", 20_000, 1_500, weekly_rate=0.03),
-    ]
-    budget = 15_000
+def ask_float(prompt, min_value=0):
+    """รับตัวเลขจากผู้ใช้ วนถามใหม่ถ้ากรอกผิดหรือค่าต่ำกว่าที่กำหนด"""
+    while True:
+        raw = input(prompt).strip().replace(",", "")
+        try:
+            value = float(raw)
+            if value < min_value:
+                print(f"  ค่าต้องไม่น้อยกว่า {min_value} ลองใหม่อีกครั้ง")
+                continue
+            return value
+        except ValueError:
+            print("  กรุณากรอกเป็นตัวเลข เช่น 15000 หรือ 15000.50")
+
+
+def choose_debt_type():
+    print("\nเลือกประเภทหนี้:")
+    for key, (label, _, _, _) in DEBT_TYPES.items():
+        print(f"  {key}. {label}")
+    while True:
+        choice = input("กรุณากรอกหมายเลข (หรือพิมพ์ 'จบ' ถ้ากรอกครบแล้ว): ").strip()
+        if choice.lower() in ("จบ", "done", "exit"):
+            return None
+        if choice in DEBT_TYPES:
+            return choice
+        print("  เลือกไม่ถูกต้อง ลองใหม่อีกครั้ง")
+
+
+def collect_debts_from_user():
+    """วนรับหนี้ทีละก้อนจากผู้ใช้ จนกว่าจะพิมพ์ 'จบ'"""
+    debts = []
+    print("=== กรอกรายการหนี้ของคุณ ===")
+
+    while True:
+        type_key = choose_debt_type()
+        if type_key is None:
+            break
+
+        label, debt_class, default_rate, rate_field = DEBT_TYPES[type_key]
+        name = input(f"ชื่อหนี้ (เช่น '{label} ธนาคาร A'): ").strip() or label
+        balance = ask_float("ยอดหนี้คงเหลือ (บาท): ", min_value=1)
+        min_payment = ask_float("ยอดผ่อนขั้นต่ำต่อเดือน (บาท): ", min_value=1)
+
+        rate_prompt = {
+            "annual_rate": f"ดอกเบี้ยต่อปี % (ค่าเริ่มต้น {default_rate:.1%}, เคาะ Enter ใช้ค่าเริ่มต้น): ",
+            "flat_rate": f"ดอกเบี้ย flat rate ต่อปี % (ค่าเริ่มต้น {default_rate:.1%}): ",
+            "weekly_rate": f"ดอกเบี้ยต่อสัปดาห์ % (ค่าเริ่มต้น {default_rate:.1%}): ",
+        }[rate_field]
+
+        raw_rate = input(rate_prompt).strip()
+        rate = float(raw_rate) / 100 if raw_rate else default_rate
+
+        debt = debt_class(name, balance, min_payment, **{rate_field: rate})
+        debts.append(debt)
+        print(f"  ➜ เพิ่มแล้ว: {debt}")
+
+    return debts
+
+
+def ask_monthly_budget(debts):
+    min_total = sum(d.min_payment for d in debts)
+    print(f"\nยอดผ่อนขั้นต่ำรวมของคุณคือ {min_total:,.0f} บาท/เดือน")
+    while True:
+        budget = ask_float("งบที่พร้อมจ่ายหนี้ต่อเดือน (บาท): ", min_value=1)
+        if budget < min_total:
+            print(f"  งบต้องไม่น้อยกว่ายอดขั้นต่ำรวม {min_total:,.0f} บาท ลองใหม่")
+            continue
+        return budget
+
+
+# ======================================================================
+# 6) MAIN: เชื่อมทุกส่วนเข้าด้วยกัน
+# ======================================================================
+def main():
+    debts = collect_debts_from_user()
+    if not debts:
+        print("ไม่มีหนี้ให้วิเคราะห์ จบโปรแกรม")
+        return
+
+    budget = ask_monthly_budget(debts)
+
+    print("\n" + "=" * 50)
+    print("สรุปหนี้ทั้งหมดของคุณ")
+    print("=" * 50)
+    for d in debts:
+        print(f"  {d}")
+    print(f"\nงบที่ใช้จ่ายหนี้ต่อเดือน: {budget:,.0f} บาท")
 
     strategies = [SnowballStrategy(), AvalancheStrategy(), HybridStrategy()]
-    results = compare_strategies(my_debts, budget, strategies)
+    results = compare_strategies(debts, budget, strategies)
 
-    print(f"หนี้ทั้งหมด: {my_debts}\n")
-    print(f"เปรียบเทียบ {len(strategies)} กลยุทธ์ (งบ {budget:,.0f} บาท/เดือน)\n")
+    print("\n" + "=" * 50)
+    print("ผลการวิเคราะห์ (เรียงจากดอกเบี้ยรวมน้อยสุด)")
+    print("=" * 50)
     for rank, report in enumerate(results, start=1):
-        print(f"อันดับ {rank}: {report}\n")
+        print(f"\nอันดับ {rank}: {report}")
+
+    best = results[0]
+    print(f"\n💡 กลยุทธ์ที่เหมาะกับคุณที่สุด (ดอกเบี้ยถูกสุด): {best.strategy_name}")
 
 
-while True:
-
-    try:
-        total_Debt = float(input("How many Total Debt >> "))
-        feel = input("How are you feeling >> ")
-        income_month = float(input("How many income on Monthly >> "))
-        income_year = float(input("How many income on year >> "))
-
-
-    except ValueError:
-        print("Need for Value")
+if __name__ == "__main__":
+    main()
